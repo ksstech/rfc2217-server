@@ -526,21 +526,38 @@ static void process_subnegotiation(rfc2217_server_t server)
         uint32_t new_baudrate = baudrate;
         if (server->config.on_baudrate) {
             new_baudrate = server->config.on_baudrate(server->config.ctx, baudrate);
+	        ESP_LOGI(TAG, "Set baudrate: requested %" PRIu32 ", configured %" PRIu32, baudrate, new_baudrate);
+		} else {
+	        ESP_LOGW(TAG, "Set baudrate: %" PRIu32 " - not configured, accepting", baudrate);
         }
-        ESP_LOGD(TAG, "Set baudrate: requested %" PRIu32 ", accepted %" PRIu32, baudrate, baudrate);
         uint8_t data[4] = {new_baudrate >> 24, new_baudrate >> 16, new_baudrate >> 8, new_baudrate};
         rfc2217_send_subnegotiation(server, T_SERVER_SET_BAUDRATE, data, 4);
     } else if (subnegotiation == T_SET_DATASIZE) {
         uint8_t datasize = server->suboption[2];
-        ESP_LOGD(TAG, "Set datasize: %d - not supported, accepting", datasize);
+		if (server->config.on_datasize) {
+			server->suboption[2] = server->config.on_datasize(server->config.ctx, datasize);
+	        ESP_LOGI(TAG, "Set datasize: requested %" PRIu8 ", configured %" PRIu8, datasize, server->suboption[2]);
+		} else {
+	        ESP_LOGW(TAG, "Set datasize: %" PRIu8 " - not configured, accepting", datasize);
+		}
         rfc2217_send_subnegotiation(server, T_SERVER_SET_DATASIZE, &server->suboption[2], 1);
     } else if (subnegotiation == T_SET_PARITY) {
         uint8_t parity = server->suboption[2];
-        ESP_LOGD(TAG, "Set parity: %d - not supported, accepting", parity);
+		if (server->config.on_parity) {
+			server->suboption[2] = server->config.on_parity(server->config.ctx, parity);
+	        ESP_LOGI(TAG, "Set parity: requested %" PRIu8 ", configured %" PRIu8, parity, server->suboption[2]);
+		} else {
+	        ESP_LOGW(TAG, "Set parity: %" PRIu8 " - not configured, accepting", parity);
+		}
         rfc2217_send_subnegotiation(server, T_SERVER_SET_PARITY, &server->suboption[2], 1);
     } else if (subnegotiation == T_SET_STOPSIZE) {
         uint8_t stopsize = server->suboption[2];
-        ESP_LOGD(TAG, "Set stopsize: %d - not supported, accepting", stopsize);
+		if (server->config.on_stopsize) {
+			server->suboption[2] = server->config.on_stopsize(server->config.ctx, stopsize);
+	        ESP_LOGI(TAG, "Set stopsize: requested %" PRIu8 ", configured %" PRIu8, stopsize, server->suboption[2]);
+		} else {
+	        ESP_LOGW(TAG, "Set stopsize: %" PRIu8 " - not configured, accepting", stopsize);
+		}
         rfc2217_send_subnegotiation(server, T_SERVER_SET_STOPSIZE, &server->suboption[2], 1);
     } else if (subnegotiation == T_SET_CONTROL) {
         uint8_t control_byte = server->suboption[2];
@@ -548,8 +565,10 @@ static void process_subnegotiation(rfc2217_server_t server)
         rfc2217_control_t new_control = control;
         if (server->config.on_control) {
             new_control = server->config.on_control(server->config.ctx, control);
-        }
-        ESP_LOGD(TAG, "Set control: requested %d, accepted %d", control, new_control);
+	        ESP_LOGD(TAG, "Set control: requested %d, configured %d", control, new_control);
+        } else {
+    	    ESP_LOGD(TAG, "Set control: %d - not configured, accepting", control);
+		}
         uint8_t data[1] = {new_control};
         rfc2217_send_subnegotiation(server, T_SERVER_SET_CONTROL, data, 1);
     } else if (subnegotiation == T_NOTIFY_LINESTATE) {
@@ -562,13 +581,16 @@ static void process_subnegotiation(rfc2217_server_t server)
         rfc2217_send_subnegotiation(server, T_SERVER_NOTIFY_MODEMSTATE, &server->suboption[2], 1);
     } else if (subnegotiation == T_PURGE_DATA) {
         uint8_t purge = server->suboption[2];
-        rfc2217_send_subnegotiation(server, T_SERVER_PURGE_DATA, &server->suboption[2], 1);
+//why?	rfc2217_send_subnegotiation(server, T_SERVER_PURGE_DATA, &server->suboption[2], 1);
         rfc2217_purge_t purge_type = (rfc2217_purge_t)purge;
-        rfc2217_purge_t purge_result = purge_type;
+        rfc2217_purge_t purge_result;
         if (server->config.on_purge) {
-            server->config.on_purge(server->config.ctx, purge_type);
-        }
-        ESP_LOGD(TAG, "Purge data: requested %d, accepted %d", purge_type, purge_result);
+            purge_result = server->config.on_purge(server->config.ctx, purge_type);
+	        ESP_LOGD(TAG, "Purge data: requested %d, accepted %d", purge_type, purge_result);
+        } else {
+			purge_result = purge_type;
+	        ESP_LOGD(TAG, "Purge data: %d - not configured, accepting", purge_type);
+		}
         uint8_t data[1] = {purge_result};
         rfc2217_send_subnegotiation(server, T_SERVER_PURGE_DATA, data, 1);
     } else {
